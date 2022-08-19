@@ -21,6 +21,12 @@ def format_data(weather_data):
     data = [weather_data['properties']['timeseries'][i]['data']['instant']['details'] for i in range(len(weather_data['properties']['timeseries']))]
     times = [weather_data['properties']['timeseries'][i]['time'] for i in range(len(weather_data['properties']['timeseries']))]
     df = pd.DataFrame(data, index=times)
+    df.index = pd.to_datetime(df.index)
+    df.index.name = 'forecast_time'
+    df['lat'] = weather_data['geometry']['coordinates'][1]
+    df['lon'] = weather_data['geometry']['coordinates'][0]
+    df['height'] =weather_data['geometry']['coordinates'][2]
+    df['timestamp'] = weather_data['properties']['meta']['updated_at']
     #precipitation1h = pd.DataFrame([precip1h(i) for i in range(len(weather_data['properties']['timeseries']))], index=times)
     #df = df.join(precipitation1h)
     return df
@@ -30,10 +36,11 @@ def format_data(weather_data):
 def on_message(client, userdata, message):
     msg = json.loads(message.payload)
     df = format_data(msg)
+    print(df)
     #insert preprocessing for the data here from json dump to lines
     with InfluxDBClient("http://localhost:8086", token=token, org=org) as dbclient:
         write_api = dbclient.write_api(write_options=SYNCHRONOUS)
-        write_api.write(bucket, record=df, data_frame_measurement_name='weather', data_frame_tag_columns=['data'])
+        write_api.write(bucket, record=df, data_frame_measurement_name=df['timestamp'][0], data_frame_tag_columns='forecast')
     print('successfully wrote to DB')
 
 #connect to broker
